@@ -31,11 +31,36 @@ def gerar_som(frequencia, duracao=0.12, volume=0.25, tipo="senoide"):
     return pygame.mixer.Sound(buffer=buffer)
 
 
+def gerar_zap(freq_inicial=2300, freq_final=700, duracao=0.075, volume=0.12):
+    """Tiro "zap" de fliperama: onda quadrada que desce rapido do agudo para o medio.
+
+    A frequencia cai de `freq_inicial` a `freq_final`, o pulso vai ficando mais estreito
+    (timbre mais fino no fim) e o volume decai de forma exponencial, o que deixa o som seco.
+    """
+    taxa_amostragem = 44100
+    n_amostras = int(taxa_amostragem * duracao)
+    buffer = array.array("h", [0] * n_amostras)
+    amplitude = int(32767 * volume)
+    fase = 0.0  # em ciclos
+
+    for i in range(n_amostras):
+        t = i / taxa_amostragem
+        progresso = i / n_amostras
+        frequencia = freq_inicial * (freq_final / freq_inicial) ** (progresso ** 0.7)
+        fase += frequencia / taxa_amostragem
+        largura = 0.5 - 0.3 * progresso  # fracao do ciclo em que a onda fica no alto
+        valor = 1.0 if fase % 1.0 < largura else -1.0
+        envelope = min(t / 0.001, 1.0) * math.exp(-3.5 * progresso)  # ataque de 1 ms + queda
+        buffer[i] = int(valor * amplitude * envelope)
+
+    return pygame.mixer.Sound(buffer=buffer)
+
+
 def criar_sons():
     try:
         pygame.mixer.init(frequency=44100, size=-16, channels=1)
         return {
-            "tiro": gerar_som(700, 0.06, 0.12, "quadrada"),
+            "tiro": gerar_zap(),
             "explosao": gerar_som(140, 0.18, 0.25, "ruido"),
             "colisao": gerar_som(110, 0.35, 0.3, "quadrada"),
             "item": gerar_som(1200, 0.12, 0.2, "senoide"),
