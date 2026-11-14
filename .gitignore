@@ -1,0 +1,17 @@
+# Ambientes virtuais
+.venv/
+venv/
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Configuracoes de IDE
+.vscode/
+.idea/
+
+# Arquivos gerados pelo jogo / ferramentas
+recorde.txt
+recorde_*.txt
+ranking.json
+ferramentas/plantuml.jar
