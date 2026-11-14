@@ -1,5 +1,6 @@
 """HUD, avisos e telas de inicio / game over (estilo tech minimalista)."""
 
+import math
 from dataclasses import dataclass
 
 import pygame
@@ -334,8 +335,11 @@ def desenhar_tela_pausa(tela, fontes, listas, tela_cheia, frame):
 # ---------------------------------------------------------------------------
 # Escolha de melhoria (a cada nivel)
 # ---------------------------------------------------------------------------
-LARGURA_CARTA, ALTURA_CARTA, VAO_CARTA = 230, 180, 30
-Y_CARTA = ALTURA / 2 - 70
+LARGURA_CARTA, ALTURA_CARTA, VAO_CARTA = 230, 230, 30
+Y_CARTA = ALTURA / 2 - 90
+RAIO_ICONE = 24  # metade do tamanho do icone da carta
+# cor do icone quando a melhoria nao usa o ciano padrao
+CORES_ICONE = {"escudo": COR_ITEM, "arsenal": COR_EXPLOSIVO, "recarga": COR_EXPLOSIVO, "reparo": COR_PERIGO}
 
 
 def _retangulos_cartas(quantidade, tela=None):
@@ -376,6 +380,83 @@ def _quebrar(texto, limite):
     return linhas + [atual] if atual else linhas
 
 
+def desenhar_icone_melhoria(tela, chave, cx, cy, raio, cor, brilho=True):
+    """Icone vetorial da melhoria `chave`, centrado em (cx, cy) em pixels da tela.
+
+    Os tracos usam coordenadas locais de -1 a 1 (y para baixo), multiplicadas por `raio`.
+    """
+
+    def p(x, y):
+        return cx + x * raio, cy + y * raio
+
+    def seg(a, b):
+        grafico.linha(tela, cor, p(*a), p(*b), brilho)
+
+    def poli(pontos):
+        grafico.contorno(tela, cor, [p(*q) for q in pontos], brilho)
+
+    def polar(r, graus, centro=(0.0, 0.0)):
+        # 0 grau aponta para cima e o angulo cresce no sentido horario
+        rad = math.radians(graus)
+        return centro[0] + r * math.sin(rad), centro[1] - r * math.cos(rad)
+
+    def arco(r, inicio, fim, centro=(0.0, 0.0), passos=16):
+        pontos = [polar(r, inicio + (fim - inicio) * k / passos, centro) for k in range(passos + 1)]
+        for a, b in zip(pontos, pontos[1:]):
+            seg(a, b)
+
+    def ponta(local, direcao, tamanho=0.32):
+        # ponta de seta em `local`, apontando para `direcao` (graus)
+        for desvio in (150, -150):
+            seg(local, polar(tamanho, direcao + desvio, local))
+
+    if chave == "cadencia":  # tres setas empilhadas: tiros em sequencia rapida
+        for y in (-0.85, -0.3, 0.25):
+            seg((-0.6, y + 0.5), (0, y))
+            seg((0, y), (0.6, y + 0.5))
+    elif chave == "multiplo":  # tres tiros saindo em leque
+        origem = (0, 0.9)
+        for graus in (-32, 0, 32):
+            fim = polar(1.5, graus, origem)
+            seg(polar(0.35, graus, origem), fim)
+            arco(0.13, 0, 360, polar(1.68, graus, origem), 8)
+    elif chave == "alcance":  # tiro que vai longe: marca de saida, rastro e seta
+        seg((-0.95, -0.4), (-0.95, 0.4))
+        seg((-0.7, 0), (-0.45, 0))
+        seg((-0.25, 0), (0, 0))
+        seg((0.2, 0), (0.95, 0))
+        ponta((0.95, 0), 90, 0.42)
+    elif chave == "motor":  # bocal do propulsor com chamas
+        poli([(-0.35, -0.9), (0.35, -0.9), (0.62, -0.1), (-0.62, -0.1)])
+        seg((-0.38, 0.12), (-0.38, 0.5))
+        seg((0, 0.12), (0, 0.95))
+        seg((0.38, 0.12), (0.38, 0.5))
+    elif chave == "manobra":  # nave entre duas setas de giro
+        poli([(0, -0.4), (0.27, 0.3), (0, 0.15), (-0.27, 0.3)])
+        for inicio in (35, 215):
+            arco(0.85, inicio, inicio + 110)
+            ponta(polar(0.85, inicio + 110), inicio + 200, 0.3)
+    elif chave == "escudo":  # escudo com um "+" (dura mais)
+        poli([(0, -0.92), (0.75, -0.62), (0.75, 0.08), (0, 0.95), (-0.75, 0.08), (-0.75, -0.62)])
+        seg((0, -0.4), (0, 0.3))
+        seg((-0.35, -0.05), (0.35, -0.05))
+    elif chave == "arsenal":  # bomba com pavio aceso
+        centro = (-0.12, 0.25)
+        arco(0.62, 0, 360, centro, 24)
+        seg(polar(0.62, 45, centro), (0.62, -0.62))
+        for graus in (0, 60, 120):
+            seg(polar(0.14, graus, (0.62, -0.62)), polar(0.34, graus, (0.62, -0.62)))
+    elif chave == "recarga":  # seta circular em volta de um explosivo
+        arco(0.85, 50, 340, passos=22)
+        ponta(polar(0.85, 340), 70, 0.34)
+        arco(0.22, 0, 360, passos=10)
+    elif chave == "reparo":  # cruz de conserto
+        a, b = 0.28, 0.85
+        poli([(-a, -b), (a, -b), (a, -a), (b, -a), (b, a), (a, a), (a, b), (-a, b), (-a, a), (-b, a), (-b, -a), (-a, -a)])
+    else:  # melhoria sem icone proprio: losango generico
+        poli([(0, -0.8), (0.8, 0), (0, 0.8), (-0.8, 0)])
+
+
 def desenhar_tela_melhoria(tela, fontes, nivel, opcoes, niveis_atuais, selecionada, pronto, quem=None):
     """`quem`: (nome, cor) do jogador que escolhe, no multiplayer."""
     escurecer_tela(tela, 175)
@@ -399,13 +480,21 @@ def desenhar_tela_melhoria(tela, fontes, nivel, opcoes, niveis_atuais, seleciona
             tela.blit(fundo, rect.topleft)
         pygame.draw.rect(tela, cor, rect, 2 if ativa else 1)
 
-        desenhar_texto(tela, fontes.pequena, f"[{i + 1}]", rect.centerx / sx, rect.top / sy + 20 / sy, cor)
+        desenhar_texto(tela, fontes.pequena, f"[{i + 1}]", rect.centerx / sx, rect.top / sy + 18 / sy, cor)
+        # o icone cresce com a tela; os textos (fonte de tamanho fixo) ficam logo abaixo dele
+        raio = RAIO_ICONE * min(sx, sy)
+        y_texto = rect.top + 34 + 2 * raio
+        cor_icone = CORES_ICONE.get(melhoria.chave, COR_PRIMARIA)
+        desenhar_icone_melhoria(
+            tela, melhoria.chave, rect.centerx, rect.top + 34 + raio, raio,
+            cor_icone if ativa else grafico.misturar(cor_icone, 0.7), brilho=ativa,
+        )
         desenhar_texto(
-            tela, fontes.media, melhoria.nome, rect.centerx / sx, rect.top / sy + 52 / sy,
+            tela, fontes.media, melhoria.nome, rect.centerx / sx, (y_texto + 26) / sy,
             COR_SECUNDARIA if ativa else COR_APAGADA,
         )
         for j, linha in enumerate(_quebrar(melhoria.descricao, 26)):
-            desenhar_texto(tela, fontes.pequena, linha, rect.centerx / sx, rect.top / sy + 86 / sy + j * 18 / sy, COR_SECUNDARIA)
+            desenhar_texto(tela, fontes.pequena, linha, rect.centerx / sx, (y_texto + 56 + j * 18) / sy, COR_SECUNDARIA)
 
         # nivel atual -> proximo (quadradinhos)
         atual = niveis_atuais.get(melhoria.chave, 0)
