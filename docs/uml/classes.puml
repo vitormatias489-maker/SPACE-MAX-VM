@@ -1,0 +1,290 @@
+@startuml classes
+title SpaceMax - Diagrama de classes
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle folder
+hide empty members
+
+package "spacemax" {
+
+  class Jogo {
+    - tela: Surface
+    - relogio: Clock
+    - fontes: Fontes
+    - sons: dict[str, Sound] | None
+    - recorde: int
+    - fundo: PlanoDeFundo
+    - estrelas: list[Estrela]
+    - frame: int
+    - estado: str
+    - nave: Nave
+    - meteoros: list[Meteoro]
+    - tiros: list[Tiro]
+    - itens: list[Item]
+    - particulas: list[Particula]
+    - ondas: list[Onda]
+    - tremor: int
+    - cena: Surface
+    - pontuacao: int
+    - vidas: int
+    - nivel: int
+    - novo_recorde: bool
+    - tempo_aviso_nivel: int
+    - tempo_aviso_galaxia: int
+    - frames_ate_proximo_spawn: int
+    - tempo_ate_proximo_item: int
+    --
+    + executar()
+    + reiniciar()
+    + processar_eventos()
+    + acao_principal()
+    + disparar()
+    + atualizar()
+    + desenhar()
+    + sair()
+    - ler_controles()
+    - calcular_nivel(): int
+    - atualizar_nivel()
+    - velocidade_asteroide(): float
+    - intervalo_spawn(): int
+    - lancar_onda()
+    - gerar_asteroides()
+    - gerar_itens()
+    - tingir_estrelas()
+    - checar_colisoes_tiro_meteoro()
+    - checar_colisao_nave()
+    - destruir_asteroide(meteoro)
+    - efeito_pegar_escudo()
+    - efeito_impacto_escudo(meteoro)
+    - deslocamento_tremor(): (float, float)
+    - usar_dash()
+    - perder_vida()
+    - criar_explosao(x, y, cor, quantidade)
+    - fim_de_jogo()
+    - desenhar_hud()
+  }
+
+  package "galaxias" {
+    class Galaxia <<dataclass>> {
+      + nome: str
+      + cor_fundo: RGB
+      + cores_nebulosa: (RGB, RGB)
+      + cor_espiral: RGB
+      + cor_estrelas: RGB
+      + cor_grade: RGB
+    }
+
+    class PlanoDeFundo {
+      {static} DURACAO_TRANSICAO = 90
+      + indice: int
+      + fundo: Surface
+      + fundo_anterior: Surface | None
+      + tempo_transicao: int
+      --
+      + galaxia: Galaxia <<property>>
+      + ir_para(indice, com_transicao): bool
+      + atualizar()
+      + desenhar(tela)
+    }
+    note bottom of PlanoDeFundo
+      Uma galaxia nova a cada 3 niveis
+      (NIVEIS_POR_GALAXIA). Fundos gerados
+      proceduralmente por renderizar_fundo().
+    end note
+  }
+
+  package "interface" {
+    class Fontes {
+      + titulo: Font
+      + grande: Font
+      + media: Font
+      + pequena: Font
+    }
+    note bottom of Fontes
+      Funcoes do modulo:
+      desenhar_hud(), desenhar_aviso(),
+      desenhar_tela_inicio(), desenhar_tela_gameover(),
+      desenhar_cantoneiras(), desenhar_texto()
+    end note
+  }
+
+  package "entidades" {
+    abstract class Entidade {
+      + x: float
+      + y: float
+      --
+      + {abstract} atualizar()
+      + {abstract} desenhar(tela)
+    }
+
+    abstract class EntidadeColidivel {
+      + raio: float
+      + vx: float
+      + vy: float
+      --
+      + mover()
+      + atravessar_bordas()
+      + colide_com(outra: EntidadeColidivel): bool
+    }
+
+    class Nave {
+      {static} RAIO = 13
+      + angulo: float
+      + velocidade_angular: float
+      + potencia: float
+      + propulsor_ligado: bool
+      + cooldown_atual: int
+      + tempo_dash: int
+      + tempo_escudo: int
+      + tempo_invencivel: int
+      + clarao: int
+      + frame: int
+      --
+      + girar(direcao)
+      + acelerar()
+      + frear()
+      + direcao(): (float, float)
+      + dash()
+      + limitar_velocidade()
+      + emitir_rastro(): list[Particula]
+      + pode_atirar(): bool
+      + atirar(): Tiro
+      + protegida: bool <<property>>
+      + ativar_escudo(frames)
+      + impacto_no_escudo()
+      + reaparecer(frames_invencivel)
+      + atualizar()
+      + desenhar(tela)
+    }
+
+    class Tiro {
+      {static} RAIO = 2
+      + vida: int
+      --
+      + atualizar()
+      + expirou(): bool
+      + desenhar(tela)
+    }
+
+    class Meteoro {
+      + tamanho: int
+      + pontos: int
+      + velocidade_base: float
+      + angulo: float
+      + velocidade_angular: float
+      + forma: list[tuple[float, float]]
+      --
+      + {static} na_borda(velocidade): Meteoro
+      + quebrar(): list[Meteoro]
+      + atualizar()
+      + desenhar(tela)
+    }
+    note right of Meteoro
+      GRANDE (3) -> 2 MEDIOS (2)
+      MEDIO  (2) -> 2 PEQUENOS (1)
+      PEQUENO(1) -> destruido
+    end note
+
+    class Item {
+      {static} RAIO = 12
+      + coletado: bool
+      + vida: int
+      + angulo: float
+      --
+      + atualizar()
+      + expirou(): bool
+      + desenhar(tela)
+    }
+
+    class Particula {
+      + vx: float
+      + vy: float
+      + vida: int
+      + vida_max: int
+      + cor: RGB
+      --
+      + atualizar()
+      + morta(): bool
+      + desenhar(tela)
+    }
+
+    class Onda {
+      + cor: RGB
+      + raio_inicial: float
+      + raio_final: float
+      + duracao: int
+      + tempo: int
+      --
+      + progresso: float <<property>>
+      + atualizar()
+      + terminou(): bool
+      + desenhar(tela)
+    }
+
+    class Estrela {
+      + profundidade: float
+      + velocidade: float
+      + cor: RGB
+      --
+      + tingir(cor_base)
+      + atualizar()
+      + desenhar(tela)
+    }
+  }
+
+  class "sons" as mod_sons <<(M,#FFD37F) modulo>> {
+    + gerar_som(frequencia, duracao, volume, tipo): Sound
+    + criar_sons(): dict[str, Sound] | None
+    + tocar(sons, nome)
+  }
+
+  class "recorde" as mod_recorde <<(M,#FFD37F) modulo>> {
+    + carregar_recorde(): int
+    + salvar_recorde(valor)
+  }
+
+  class "grafico" as mod_grafico <<(M,#FFD37F) modulo>> {
+    + misturar(cor, intensidade): RGB
+    + rotacionar(pontos, angulo, x, y)
+    + contorno(tela, cor, pontos, brilho)
+    + linha(tela, cor, inicio, fim, brilho)
+  }
+
+  class "config" as mod_config <<(M,#FFD37F) modulo>> {
+    LARGURA, ALTURA, FPS
+    paleta, fisica da nave
+    DADOS_ASTEROIDE, dificuldade
+  }
+}
+
+' ---- Hierarquia (heranca) ----
+Entidade <|-- EntidadeColidivel
+Entidade <|-- Particula
+Entidade <|-- Estrela
+Entidade <|-- Onda
+EntidadeColidivel <|-- Nave
+EntidadeColidivel <|-- Tiro
+EntidadeColidivel <|-- Meteoro
+EntidadeColidivel <|-- Item
+
+' ---- Composicao ----
+Jogo *-- "1" Fontes
+Jogo *-- "1" PlanoDeFundo
+Jogo *-- "1" Nave
+Jogo *-- "0..*" Tiro
+Jogo *-- "0..*" Meteoro
+Jogo *-- "0..*" Item
+Jogo *-- "0..*" Particula
+Jogo *-- "0..*" Onda
+Jogo *-- "90" Estrela
+PlanoDeFundo ..> Galaxia : usa >
+
+Nave ..> Tiro : cria >
+Nave ..> Particula : emite rastro >
+Meteoro ..> Meteoro : quebrar() cria >
+Jogo ..> mod_sons : usa >
+Jogo ..> mod_recorde : usa >
+Jogo ..> mod_config : usa >
+Nave ..> mod_grafico : desenha com >
+
+@enduml
