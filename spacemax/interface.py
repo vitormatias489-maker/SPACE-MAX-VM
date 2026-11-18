@@ -211,18 +211,37 @@ def desenhar_arma(
     cor = COR_EXPLOSIVO if explosiva else cor_nave
     desenhar_texto(tela, fontes.media, arma, x, y + 16, cor, ancora)
 
-    # municao explosiva: um circulo por tiro (cheio = disponivel)
+    # municao explosiva: sempre fixa no canto inferior da tela
+    sx, sy = _escala_tela(tela)
+    raio = max(4, int(5 * min(sx, sy)))
+    espacamento = max(18, int(18 * sx))
+    margem_x = max(24, int(MARGEM * sx))
+    margem_y = max(24, int(24 * sy))
+    largura_tela = tela.get_width()
+    altura_tela = tela.get_height()
+
     for i in range(municao_max):
-        centro = (x + sinal * (6 + i * 18), y + 60)
-        if i < municao:
-            pygame.draw.circle(tela, COR_EXPLOSIVO, centro, 5)
+        if direita:
+            cx = largura_tela - margem_x - (6 * sx) - i * espacamento
         else:
-            pygame.draw.circle(tela, grafico.misturar(COR_EXPLOSIVO, 0.4), centro, 5, 1)
+            cx = margem_x + (6 * sx) + i * espacamento
+        cy = altura_tela - margem_y
+        centro = (int(cx), int(cy))
+        if i < municao:
+            pygame.draw.circle(tela, COR_EXPLOSIVO, centro, raio)
+        else:
+            pygame.draw.circle(tela, grafico.misturar(COR_EXPLOSIVO, 0.4), centro, raio, 1)
+
     if municao < municao_max:
-        largura = 70
-        bx = x + municao_max * 18 + 6 if not direita else x - municao_max * 18 - 6 - largura
-        pygame.draw.rect(tela, grafico.misturar(COR_EXPLOSIVO, 0.35), (bx, y + 57, largura, 6), 1)
-        pygame.draw.rect(tela, COR_EXPLOSIVO, (bx + 1, y + 58, int((largura - 2) * fracao_recarga), 4))
+        largura = int(70 * sx)
+        altura = max(6, int(6 * sy))
+        if direita:
+            bx = largura_tela - margem_x - largura
+        else:
+            bx = margem_x
+        by = altura_tela - margem_y - (18 * sy)
+        pygame.draw.rect(tela, grafico.misturar(COR_EXPLOSIVO, 0.35), (bx, by, largura, altura), 1)
+        pygame.draw.rect(tela, COR_EXPLOSIVO, (bx + 1, by + 1, int((largura - 2) * fracao_recarga), max(1, int(altura - 2))))
 
 
 # ---------------------------------------------------------------------------
